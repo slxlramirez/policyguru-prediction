@@ -1,0 +1,132 @@
+<form>
+  <label>Analyst - LLP Prediction</label>
+  <fieldset submitButton="false">
+    <input type="text" token="startTime_token">
+      <label>Predict Time (YYYY-MM-DD hh24:mi:ss)</label>
+    </input>
+    <input type="text" token="daysBefore_token">
+      <label>Days Before</label>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Calls by 15m Bucket</title>
+      <chart>
+        <search id="cdr">
+          <query>| dbxquery 
+maxrows=250000
+connection="ngp_connection" 
+timeout=1800 query="
+SELECT 
+       to_char(to_timestamp(floor((extract('epoch' from to_timestamp(analyticstime/1000)) / 900 )) * 900),'YYYY-MM-DD hh24:MI')  as bucket,
+       COUNT(a.guid) as calls
+FROM   master.flowstart a
+WHERE  a. direction=1 AND
+       a.routername LIKE 'enum%' AND
+       a.analyticstime &gt;= (extract ('epoch' from timestamp '$startTime_token$' AT TIME ZONE 'CST6CDT' - interval '$daysBefore_token$ days') * 1000)::bigint AND
+       a.analyticstime  &lt; (extract ('epoch' from timestamp '$startTime_token$' AT TIME ZONE 'CST6CDT') * 1000)::bigint
+GROUP BY to_char(to_timestamp(floor((extract('epoch' from to_timestamp(analyticstime/1000)) / 900 )) * 900),'YYYY-MM-DD hh24:MI')
+" shortnames=t
+| table *
+| eval _time=strptime(bucket,"%Y-%m-%d %H:%M")
+| timechart span=15m fixedrange=false sum(calls) as calls</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Upper 99 Last Result</title>
+        <search base="cdr_upper99">
+          <query>| sort -_time
+| head 1
+| rename upper99(prediction(calls)) as upper99 prediction(calls) as base_prediction
+| eval diff=calls-upper99
+| table _time calls upper99 diff</query>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Upper 99 Prediction</title>
+        <search id="cdr_upper99" base="cdr">
+          <query>| predict upper99=upper99 algorithm=LLP period=96 calls holdback=1 future_timespan=1</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Upper 97 Last Result</title>
+        <search base="cdr_upper97">
+          <query>| sort -_time
+| head 1
+| rename upper97(prediction(calls)) as upper97 prediction(calls) as base_prediction
+| eval diff=calls-upper97
+| table _time calls upper97 diff</query>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Upper 97 Prediction</title>
+        <search id="cdr_upper97" base="cdr">
+          <query>| predict upper97=upper97 algorithm=LLP period=96 calls holdback=1 future_timespan=1</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Upper 95 Last Result</title>
+        <search base="cdr_upper95">
+          <query>| sort -_time
+| head 1
+| rename upper95(prediction(calls)) as upper95 prediction(calls) as base_prediction
+| eval diff=calls-upper95
+| table _time calls upper95 diff</query>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Upper 95 Prediction</title>
+        <search id="cdr_upper95" base="cdr">
+          <query>| predict upper95=upper95 algorithm=
+          5 period=96 calls holdback=1 future_timespan=1</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+</form>
