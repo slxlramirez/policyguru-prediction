@@ -1,0 +1,23 @@
+| dbxquery 
+maxrows=250000
+connection="ngp_connection" 
+timeout=1800 query="
+SELECT 
+       to_char(to_timestamp(analyticstime/1000),'YYYY-MM-DD hh24:MI')  as bucket,
+       COUNT(a.guid) as calls
+FROM   master.flowstart a
+WHERE  a. direction=1 AND
+       a.routername LIKE 'enum%' AND
+       a.analyticstime >= (extract (epoch from to_timestamp(floor((extract('epoch' from now()) / 900 )) * 900) - INTERVAL '60 MINUTES') * 1000)::bigint AND
+       a.analyticstime  < (extract (epoch from to_timestamp(floor((extract('epoch' from now()) / 900 )) * 900) - INTERVAL '0 MINUTES') * 1000)::bigint
+GROUP BY to_char(to_timestamp(analyticstime/1000),'YYYY-MM-DD hh24:MI')
+" shortnames=t
+| table *
+| eval _time=strptime(bucket,"%Y-%m-%d %H:%M")
+| timechart span=1m fixedrange=false sum(calls) as calls 
+| predict upper99=upper99 algorithm=LLT calls holdback=1 future_timespan=1
+| sort -_time
+| head 1
+| rename upper99(prediction(calls)) as upper99 lower95(prediction(calls)) as lower95 prediction(calls) as base_prediction
+| eval diff=calls-upper99
+| table _time calls upper99 diff
