@@ -2,20 +2,33 @@
 maxrows=250000
 connection="ngp_connection" 
 timeout=1800 query="
+SELECT to_char(b.minute,'YYYY-MM-DD hh24:mi') as bucket,
+       COALESCE(a.calls,0) as calls
+FROM
+(
 SELECT 
-       to_char(to_timestamp(analyticstime/1000),'YYYY-MM-DD hh24:MI')  as bucket,
+       date_trunc('minute',to_timestamp(analyticstime/1000))  as bucket,
        COUNT(a.guid) as calls
 FROM   master.flowstart a
 WHERE  a. direction=1 AND
        a.routername LIKE 'enum%' AND
-       a.analyticstime >= (extract (epoch from to_timestamp(floor((extract('epoch' from now()) / 900 )) * 900) - INTERVAL '60 MINUTES') * 1000)::bigint AND
-       a.analyticstime  < (extract (epoch from to_timestamp(floor((extract('epoch' from now()) / 900 )) * 900) - INTERVAL '0 MINUTES') * 1000)::bigint
-GROUP BY to_char(to_timestamp(analyticstime/1000),'YYYY-MM-DD hh24:MI')
+       a.analyticstime >= (extract (epoch from date_trunc('minute',now()) - INTERVAL '65 MINUTES') * 1000)::bigint AND
+       a.analyticstime  < (extract (epoch from date_trunc('minute',now()) - INTERVAL  '0 MINUTES') * 1000)::bigint
+GROUP BY date_trunc('minute',to_timestamp(analyticstime/1000))
+ORDER BY date_trunc('minute',to_timestamp(analyticstime/1000))
+) a RIGHT OUTER JOIN
+(
+SELECT generate_series (
+    date_trunc('minute',now()) - INTERVAL '65 MINUTES',
+    date_trunc('minute',now()) - INTERVAL  '1 MINUTES',
+    '1 minute'::interval
+    ) as minute
+) b ON a.bucket=b.minute
 " shortnames=t
 | table *
 | eval _time=strptime(bucket,"%Y-%m-%d %H:%M")
 | timechart span=1m fixedrange=false sum(calls) as calls 
-| predict upper99=upper99 algorithm=LLT calls holdback=1 future_timespan=1
+| predict upper99=upper99 algorithm=LLT calls holdback=5 future_timespan=5
 | sort -_time
 | head 1
 | rename upper99(prediction(calls)) as upper99 lower95(prediction(calls)) as lower95 prediction(calls) as base_prediction
