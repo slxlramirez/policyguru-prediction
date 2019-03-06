@@ -17,15 +17,28 @@
 maxrows=250000
 connection="ngp_connection" 
 timeout=1800 query="
+SELECT to_char(b.minute,'YYYY-MM-DD hh24:mi') as bucket,
+       COALESCE(a.calls,0) as calls
+FROM
+(
 SELECT 
-        to_char(to_timestamp(analyticstime/1000),'YYYY-MM-DD hh24:MI')  as bucket,
+       date_trunc('minute',to_timestamp(analyticstime/1000))  as bucket,
        COUNT(a.guid) as calls
 FROM   master.flowstart a
 WHERE  a. direction=1 AND
        a.routername LIKE 'enum%' AND
-       a.analyticstime &gt;= (extract ('epoch' from timestamp '$startTime_token$' AT TIME ZONE 'CSt6CDT' - interval '$minutesBefore_token$ minutes') * 1000)::bigint AND
+       a.analyticstime &gt;= (extract ('epoch' from timestamp '$startTime_token$' AT TIME ZONE 'CSt6CDT' - interval '60 minutes') * 1000)::bigint AND
        a.analyticstime  &lt; (extract ('epoch' from timestamp '$startTime_token$' AT TIME ZONE 'CSt6CDT') * 1000)::bigint
-GROUP BY to_char(to_timestamp(analyticstime/1000),'YYYY-MM-DD hh24:MI') 
+GROUP BY date_trunc('minute',to_timestamp(analyticstime/1000))
+ORDER BY date_trunc('minute',to_timestamp(analyticstime/1000))
+) a RIGHT OUTER JOIN
+(
+SELECT generate_series (
+    date_trunc('minute',timestamp '$startTime_token$' AT TIME ZONE 'CSt6CDT' - interval '60 minutes'),
+    date_trunc('minute',timestamp '$startTime_token$' AT TIME ZONE 'CSt6CDT' -  interval '1 minutes'),
+    '1 minute'::interval
+    ) as minute
+) b ON a.bucket=b.minute
 " shortnames=t
 | table *
 | eval _time=strptime(bucket,"%Y-%m-%d %H:%M")
