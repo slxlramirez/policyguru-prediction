@@ -1,0 +1,95 @@
+<form>
+  <label>PolicyGuru Alerts CPM Prediction Check Dashboard Date Control</label>
+  <fieldset submitButton="false">
+    <input type="time" token="field1">
+      <label></label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <chart>
+        <title>Max Runtimes (seconds by 1m)</title>
+        <search base="cdr">
+          <query>| timechart span=15m max(run_time) by ss_name</query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Email Alert Triggered</title>
+        <search base="cdr">
+          <query>| search alert_actions="email"
+| timechart span=15m count by ss_name</query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Max Runtime (seconds) by Hour</title>
+        <search base="cdr">
+          <query>| timechart span=1h max(run_time) by savedsearch_name_new</query>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+    <panel>
+      <table>
+        <title>Triggered Alerts</title>
+        <search base="cdr">
+          <query>| search alert_actions="email"
+| stats count by ss_name</query>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Min, Max, Avg RunTimes</title>
+        <search base="cdr">
+          <query>| stats min(run_time) as "Min" max(run_time) as "Max" avg(run_time) as "Avg" by savedsearch_name
+| eval Avg=ROUND(Avg,3)</query>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>CDR EVENTS</title>
+        <search id="cdr">
+          <query>index="scheduler" savedsearch_name="*CPM*" 
+| table _time host savedsearch_id savedsearch_name status run_time alert_actions
+| eval alert_actions = if(alert_actions=="", "no_action_taken", alert_actions)
+| eval ss_name=case(like(savedsearch_name,"%LLP5 Prediction%"), "LLP5",like(savedsearch_name,"%LLP%"), "LLP",like(savedsearch_name,"%LLT Prediction%"), "LLT", true(), "Other")</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+</form>
