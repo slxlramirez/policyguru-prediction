@@ -1,0 +1,23 @@
+| dbxquery 
+maxrows=250000
+connection="ngp_connection" 
+timeout=1800 query="
+SELECT   TO_CHAR(to_timestamp(flowtime/1000),'YYYY-MM-DD hh24:mi') as cpm,
+         COUNT(a.guid) as calls
+FROM     master.flowstart a
+WHERE    a.routername LIKE 'enum%' AND
+         a.direction = 1 AND
+         a.analyticstime >= (extract (epoch from date_trunc('minute', now()) - INTERVAL '1 WEEK') * 1000)::bigint AND
+         a.analyticstime  < (extract (epoch from date_trunc('minute', now())) * 1000)::bigint
+GROUP BY TO_CHAR(to_timestamp(flowtime/1000),'YYYY-MM-DD hh24:mi')
+ORDER BY TO_CHAR(to_timestamp(flowtime/1000),'YYYY-MM-DD hh24:mi')
+" shortnames=t
+| table cpm calls
+| eval _time=strptime(cpm,"%Y-%m-%d %H:%M")
+| timechart span=1m fixedrange=false sum(calls) as calls
+| predict upper99=upper99 period=1440 algorithm=LLP calls holdback=1 future_timespan=1
+| rename upper99(prediction(calls)) as upper
+| eval diff=calls-upper
+| table _time upper calls diff
+| sort -_time
+| head 1
