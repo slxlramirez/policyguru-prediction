@@ -1,0 +1,2 @@
+index="scheduler" savedsearch_name="*CPM*" 
+| table _time host savedsearch_id savedsearch_name status run_time alert_actions
