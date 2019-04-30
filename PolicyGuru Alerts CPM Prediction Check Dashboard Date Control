@@ -79,7 +79,7 @@
       <table>
         <title>CDR EVENTS</title>
         <search id="cdr">
-          <query>index="scheduler" savedsearch_name="*CPM*" 
+          <query>index="scheduler" savedsearch_name="PolicyGuru Test Alert*CPM*" 
 | table _time host savedsearch_id savedsearch_name status run_time alert_actions
 | eval alert_actions = if(alert_actions=="", "no_action_taken", alert_actions)
 | eval ss_name=case(like(savedsearch_name,"%LLP5 Prediction%"), "LLP5",like(savedsearch_name,"%LLP%"), "LLP",like(savedsearch_name,"%LLT Prediction%"), "LLT", true(), "Other")</query>
